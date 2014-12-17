@@ -1,41 +1,47 @@
-Karajan
+Logical-switching-proxy
 ========
 
-A Proxy Service As Orchestration Layer
+Proxy switching dynamically for developing mobile application requires api backend
 
 Overview
 ---------
 
-![overview]
+![](https://dl.dropboxusercontent.com/u/10177896/Logical-switching-proxy.png)
 
-The concept of this service is heavily inspired by [the netflix's architecture][netflix]. Karajan provides orchestration layer through programmable API proxy with using nginx/[ngx_mruby].
-In this archietcture, orchestration logics are stored in Redis, then we can change the logics dynamically through management application `Takt`, without rebooting proxy services.
+In mobile application development with API backend, if you have multiple staging endpoint servers with development, it is often hard to switch api endpoint config.
 
-This product is also inspired by [darzana].
+`logical-switching-proxy` is a reverse proxy dynamically routing by user specified logic. For example, mobile application request the endpoint with request header
+'X-Switching-Id:', then the proxy routing request to backend staging server by user defined logic, so you can switch the api endpoint what you want without changing api endpoint config with re-build app. The logic can be written in mruby, which you can define a routing rule very easily.
 
 Demo
 ----------
 
 If you'd like to know simple usage, you can try the sample demo  in this project easily with running the Docker container we prepared.
 
-    git clone https://github.com/prevs-io/Karajan.git && cd Karajan
-    docker build -t karajan .
-    docker run -it --rm -p 49080:80 -p 49081:8080 -p 49082:3000 --name karajan karajan /data/scripts/start.sh
+    git clone https://github.com/ainoya/logical-switching-proxy.git && cd logical-switching-proxy
+    docker build -t lsp .
+    docker run -it --rm -p 49080:80 -p 49081:8080 -p 49082:3000 --name lsp lsp /data/scripts/start.sh
 
 In this demo, it demonstrates use case following:
 
-  - A client app requests data from two REST apis `http://0.0.0.0:8080/api/contents` and `http://0.0.0.0:8080/api/badge`, to rendering a showcase screen.
-  - But for saving traffic and improve speed, the client app request data from two apis at once, then we start to try bundle two apis into only one api with using Karajan.
+    - In development, your mobile application communicate with the endpoint `api.staging.com`
+    - Mobile application requests the endpoint with request header `X-Switching-Id: test-001`
+    - Logical Switching Proxy service process the request from mobile, then proxy routing requests by the value of `X-Switching-Id`.
 
-At first, insert orchestration logic into store through management service `Takt`. The orchestration logic is written in mruby, like below.
+At first, insert routing logic into store through management service `Takt`. The orchestration logic is written in mruby, like below.
 
-    api_endp_1 ||= WebAPI.new "http://0.0.0.0:8080"
-    api_endp_2 ||= WebAPI.new "http://0.0.0.0:8080"
+    case r.headers_in["X-Switching-Id"]
+    when 'test-001'
+      backend='0.0.0.0:8080'
+    when 'test-002'
+      backend='0.0.0.0:9000'
+    when 'test-003'
+      backend='0.0.0.0:9001'
+    else
+      backend='0.0.0.0:8080'
+    end
 
-    contents = JSON.parse(api_endp_1.get('/api/contents').body)
-    badges = JSON.parse(api_endp_2.get('/api/badges').body)
-
-    JSON.generate(contents.merge(badges))
+    return backend
 
 The logic is in `./takt/spec/system/score.rb`, and next write the logic to `Takt` on `http://0.0.0.0:3000/write_score` with `POST`. Of cource, these procedure is also prepared in `./takt/spec/write_score.rb`:
 
@@ -45,24 +51,30 @@ The logic is in `./takt/spec/system/score.rb`, and next write the logic to `Takt
     require 'base64'
 
     path = File.dirname(__FILE__)
+
     score=File.open(File.join(path, 'score.rb')).readlines.join('')
+
     url = 'http://0.0.0.0:49082/write_score'
-    #{<context_path> => <client logic base64 encoded>}
-    body = {'/' =>  Base64.encode64(score)}.to_json
-    # write logic
-    puts HTTParty.post(url, :body=>body)
 
-After writing the logic, check it works with `curl`.
-Note that orchestrated api endpoint is `http://0.0.0.0:80/orchestrate/`.
+    # stored logic structure: {'context path' => 'base64 encoded routing logic written in mruby'}
+    body = {'.*' =>  Base64.encode64(score)}.to_json
 
-    ➜  karajan git:(master) ✗ curl  http://0.0.0.0:49080/api/badges
-    {"badges":[{"badge1":"badge1"},{"badge2":"badge2"},{"badge3":"badge3"},{"badge4":"badge4"},{"badge5":"badge5"},{"badge6":"badge6"}]}
+    HTTParty.post(url, :body=>body)
 
-    ➜  karajan git:(master) ✗ curl  http://0.0.0.0:49080/api/contents
-    {"contents":[{"item1":"description1"},{"item2":"description2"},{"item3":"description3"}]}
+    ['test-001', 'test-002', 'test-003'].each do |id|
+      puts HTTParty.get('http://0.0.0.0:49080/api/rarities', :headers => {'X-Switching-Id' => id})
+    end
 
-    ➜  karajan git:(master) ✗ curl  http://0.0.0.0:49080/orchestrate/
-    {"contents":[{"item1":"description1"},{"item2":"description2"},{"item3":"description3"}],"badges":[{"badge1":"badge1"},{"badge2":"badge2"},{"badge3":"badge3"},{"badge4":"badge4"},{"badge5":"badge5"},{"badge6":"badge6"}]}
+After writing the routing logic, check it works with this script.
+
+    ➜  takt git:(master) ✗ bundle exec ruby spec/system/write_score.rb
+
+    #puts HTTParty.get('http://0.0.0.0:49080/api/rarities', :headers => {'X-Switching-Id' => 'test-001'})
+    {"rarities"=>{"character_1"=>" 0.1", "character_2"=>" 0.1", "character_3"=>" 0.1"}}
+    #puts HTTParty.get('http://0.0.0.0:49080/api/rarities', :headers => {'X-Switching-Id' => 'test-002'})
+    {"rarities"=>{"character_1"=>" 0.3", "character_2"=>" 0.2", "character_3"=>" 0.1"}}
+    #puts HTTParty.get('http://0.0.0.0:49080/api/rarities', :headers => {'X-Switching-Id' => 'test-003'})
+    {"rarities"=>{"character_1"=>" 0.9", "character_2"=>" 0.7", "character_3"=>" 0.5"}}
 
 Finally, you can bind the two apis into one api!
 
@@ -89,7 +101,7 @@ Or, you can create an [Issue][is].
 * License
   * Apache License, Version 2.0
 
-[is]: https://github.com/prevs-io/karajan/issues
+[is]: https://github.com/ainoya/logical-switching-proxy/issues
 [darzana]: https://github.com/kawasima/darzana
 [ngx_mruby]: https://github.com/matsumoto-r/ngx_mruby/
 [overview]: https://dl.dropboxusercontent.com/u/10177896/karajan-overview.png

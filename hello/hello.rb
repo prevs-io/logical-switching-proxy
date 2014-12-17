@@ -12,25 +12,13 @@ class Hello < Sinatra::Base
     erb :welcome
   end
 
-  get "/api/contents"  do
+  get "/api/rarities"  do
+    m = ENV['PARAM_RARITY'].to_f
     content_type :json
-    { :contents => [
-      {:item1 => 'description1'},
-      {:item2 => 'description2'},
-      {:item3 => 'description3'},
-    ]}.to_json
-  end
-
-  get "/api/badges"  do
-    content_type :json
-    { :badges => [
-      {:badge1 => 'badge1'},
-      {:badge2 => 'badge2'},
-      {:badge3 => 'badge3'},
-      {:badge4 => 'badge4'},
-      {:badge5 => 'badge5'},
-      {:badge6 => 'badge6'},
-    ]}.to_json
+    [:rarities => {:character_1 => sprintf("%4.1f",m),
+                 :character_2 => sprintf("%4.1f",m * 0.75),
+                 :character_3 => sprintf("%4.1f",m * 0.5),
+    }].to_json
   end
 
 end

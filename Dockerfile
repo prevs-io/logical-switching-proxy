@@ -55,7 +55,7 @@ ADD conf/nginx.conf /usr/local/nginx/conf/nginx.conf
 ADD scripts /data/scripts
 
 WORKDIR /data/hello
-RUN mkdir -p tmp/{log,pids}
+RUN mkdir -p log tmp/{log,pids}
 
 WORKDIR /data/takt
 RUN mkdir -p log tmp/{log,pids}

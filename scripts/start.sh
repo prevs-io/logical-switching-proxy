@@ -7,8 +7,16 @@ rbenv local 2.1 && ruby -v
 
 /usr/local/nginx/sbin/nginx &
 
+cd /data
+cp -rp hello hello1
+cp -rp hello hello2
 cd /data/hello
-bundle exec unicorn -c config/unicorn.rb -l 0.0.0.0:8080 &
+export PARAM_RARITY='0.1'; bundle exec unicorn -c config/unicorn.rb -l 0.0.0.0:8080 &
+cd /data/hello1
+export PARAM_RARITY='0.3'; bundle exec unicorn -c config/unicorn.rb -l 0.0.0.0:9000 &
+cd /data/hello2
+export PARAM_RARITY='0.9'; bundle exec unicorn -c config/unicorn.rb -l 0.0.0.0:9001 &
+
 
 cd /data/takt
 bundle exec unicorn -c config/unicorn.rb -l 0.0.0.0:3000 &

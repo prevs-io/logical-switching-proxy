@@ -1,7 +1,16 @@
-api_endp_1 ||= WebAPI.new "http://0.0.0.0:8080"
-api_endp_2 ||= WebAPI.new "http://0.0.0.0:8080"
+# Score must returns the variable "$backend".
+# $backend variable is used by parameter as http://$backend in nginx.conf
+#
 
-contents = JSON.parse(api_endp_1.get('/api/contents').body)
-badges = JSON.parse(api_endp_2.get('/api/badges').body)
+case r.headers_in["X-Switching-Id"]
+when 'test-001'
+  backend='0.0.0.0:8080'
+when 'test-002'
+  backend='0.0.0.0:9000'
+when 'test-003'
+  backend='0.0.0.0:9001'
+else
+  backend='0.0.0.0:8080'
+end
 
-JSON.generate(contents.merge(badges))
+return backend
