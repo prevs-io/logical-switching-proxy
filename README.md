@@ -24,9 +24,9 @@ If you'd like to know simple usage, you can try the sample demo  in this project
 
 In this demo, it demonstrates use case following:
 
-    - In development, your mobile application communicate with the endpoint `api.staging.com`
-    - Mobile application requests the endpoint with request header `X-Switching-Id: test-001`
-    - Logical Switching Proxy service process the request from mobile, then proxy routing requests by the value of `X-Switching-Id`.
+- In development, your mobile application communicate with the endpoint `api.staging.com`
+- Mobile application requests the endpoint with request header `X-Switching-Id: test-001`
+- Logical Switching Proxy service process the request from mobile, then proxy routing requests by the value of `X-Switching-Id`.
 
 At first, insert routing logic into store through management service `Takt`. The orchestration logic is written in mruby, like below.
 
